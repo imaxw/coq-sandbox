@@ -1,0 +1,8 @@
+**/*.glob
+**/*.aux
+**/*.vo
+**/*.vos
+**/*.vok
+**/.*.cache
+settings.json
+.vscode
