@@ -2,8 +2,11 @@ Require Import RelationClasses Morphisms Program.
 
 Require Import ProofIrrelevance FunctionalExtensionality.
 
+Set Universe Polymorphism.
+Set Polymorphic Inductive Cumulativity.
 Set Primitive Projections.
 Set Implicit Arguments.
+
 Generalizable All Variables.
 
 Notation refl := (eq_refl _).
@@ -16,7 +19,6 @@ Global Hint Resolve functional_extensionality : categories.
 Global Hint Resolve functional_extensionality_dep : categories.
 Global Hint Resolve proof_irrelevance : categories.
 
-#[universes(polymorphic, cumulative)]
 Record Category@{u0 u1} :=
 {
   (* data *)
@@ -84,7 +86,7 @@ Section Very_Small_Categories.
 End Very_Small_Categories.
 
 
-#[universes(polymorphic), canonical]
+#[canonical]
 Definition TypeCategory : Category :=
   {| Obj := Type ;
      Hom A B := forall _ : A, B ;
@@ -92,17 +94,17 @@ Definition TypeCategory : Category :=
      id _ x := x ;
      compose_assoc _ _ _ _ _ _ _ := refl ;
      compose_id_left _ _ _ := refl ;
-     compose_id_right _ _ _ := refl |}.
+     compose_id_right _ _ _ := refl
+  |}.
 
 
 Section More_Example_Categories.
 
   Program Example PreOrderCategory `(preo : PreOrder A R) :=
-  {|
-    Obj := A ;
-    Hom x y := R x y ;
-    compose _ _ _ f g := transitivity g f ;
-    id := reflexivity
+  {| Obj := A ;
+     Hom x y := R x y ;
+     compose _ _ _ f g := transitivity g f ;
+     id := reflexivity
   |}.
   Solve All Obligations with (intros; apply proof_irrelevance).
 
@@ -217,18 +219,18 @@ Section Arrows.
     section_property := proj2 inverse_property
   |}.
 
-  #[universes(polymorphic)]
-  Class Isomorphic :=
-  {
-    isomorphism : X → Y ;
-    isomorphism_property :> Isomorphism isomorphism
-  }.
-
 End Arrows.
 
 Arguments Retractible {_} [_ _] f.
 Arguments Sectionable {_} [_ _] f.
 Arguments Isomorphism {_} [_ _] f.
+
+#[universes(polymorphic)]
+Class Isomorphic {𝐂 : Category} (X Y : 𝐂) :=
+{
+  isomorphism : X → Y ;
+  isomorphism_property :> Isomorphism isomorphism
+}.
 
 Notation "f ⁻¹" := (inverse f) (at level 0) : category_scope.
 Notation "A ≅ B" := (Isomorphic A B) (at level 70, no associativity) : category_scope.
@@ -602,5 +604,22 @@ Section Yoneda_Lemma.
     apply functional_extensionality; intro g; simpl.
     rewrite compose_compat; reflexivity.
   Qed.
+
+  Global Instance yoneda_isomorphism : Isomorphism yoneda.
+  Proof.
+    exists yoneda'; split; unfold Retract, Section.
+    - apply Natural.extensionality; simpl; intro A.
+      apply functional_extensionality; simpl; intro τ.
+      apply Natural.extensionality; simpl; intro X.
+      apply functional_extensionality; simpl; intro f.
+      pose proof (H := τ.(transformation_natural) A X f).
+      pose proof (H' := equal_f H 1). simpl in H'.
+      now autorewrite with categories in H'.
+    - apply Natural.extensionality; simpl; intro A.
+      apply functional_extensionality; simpl; intro τ.
+      rewrite id_compat; reflexivity.
+  Qed.
+
+  Global Instance Yoneda : N ≅ F := {| isomorphism := yoneda |}.
 
 End Yoneda_Lemma.
