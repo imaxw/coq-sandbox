@@ -603,4 +603,4 @@ Section Yoneda_Lemma.
     rewrite compose_compat; reflexivity.
   Qed.
 
-End Section.
+End Yoneda_Lemma.
