@@ -1,31 +1,16 @@
-Require Import RelationClasses Morphisms Program.
-
-Require Import ProofIrrelevance FunctionalExtensionality.
-
-Set Universe Polymorphism.
-Set Polymorphic Inductive Cumulativity.
-Set Primitive Projections.
-Set Implicit Arguments.
+Require Import _Preliminaries.
 
 Generalizable All Variables.
 
-Notation refl := (eq_refl _).
+Open Scope category_scope.
 
-Definition notT_Empty_set := Empty_set_ind _ : notT (Empty_set).
-Local Hint Resolve notT_Empty_set : core.
-
-Create HintDb categories.
-Global Hint Resolve functional_extensionality : categories.
-Global Hint Resolve functional_extensionality_dep : categories.
-Global Hint Resolve proof_irrelevance : categories.
-
-Record Category@{u0 u1} :=
+Record Category :=
 {
   (* data *)
-  Obj :> Type@{u0} ;
-  Hom (A B : Obj) : Type@{u1} ;
-  compose (A B C : Obj) : Hom B C -> Hom A B -> Hom A C ;
-  id (A : Obj) : Hom A A ;
+  Obj :> Type ;
+  Hom : forall (A B : Obj), Type ;
+  compose : forall (A B C : Obj), Hom B C -> Hom A B -> Hom A C ;
+  id : forall (A : Obj), Hom A A ;
 
   (* axioms *)
   compose_assoc [A B C D] (f : Hom C D) (g : Hom B C) (h : Hom A B) :
@@ -33,28 +18,22 @@ Record Category@{u0 u1} :=
   compose_id_left [A B] (f : Hom A B) : compose (id B) f = f;
   compose_id_right [A B] (f : Hom A B) : compose f (id A) = f
 }.
+Bind Scope category_scope with Category.
 
 Arguments Hom {_} _ _.
 Arguments compose {_ _ _ _} _ _.
 Arguments id {_} _.
+
+Notation "A → B" := (Hom A B) : category_scope.
+Notation "f ⋅ g" := (compose f g) : category_scope.
+Notation "1" := (id _) : category_scope.
+
 Global Opaque compose_assoc compose_id_left compose_id_right.
 Global Hint Resolve compose_assoc : categories.
 Global Hint Resolve compose_id_left : categories.
 Global Hint Resolve compose_id_right : categories.
 Global Hint Rewrite -> compose_id_left : categories.
 Global Hint Rewrite -> compose_id_right : categories.
-
-
-Declare Scope category_scope.
-Bind Scope category_scope with Category Obj Hom.
-Delimit Scope category_scope with cat.
-
-Notation "A → B" := (Hom A B)
-(at level 99, right associativity, B at level 200): category_scope.
-Notation "f ∘ g" := (compose f g) : category_scope.
-Notation "1" := (id _) : category_scope.
-
-Local Open Scope category_scope.
 
 
 Section Very_Small_Categories.
@@ -65,7 +44,7 @@ Section Very_Small_Categories.
     Obj := Empty_set : Set ;
     Hom A B := Empty_set_rect _ A
   |}.
-  Solve All Obligations with contradiction.
+  Solve Obligations of EmptyCategory with contradiction.
 
   #[canonical, program]
   Definition UnitCategory : Category@{Set Set} :=
@@ -73,7 +52,6 @@ Section Very_Small_Categories.
     Obj := unit : Set ;
     Hom x y := True 
   |}.
-  Solve All Obligations with (destruct f; reflexivity).
 
   #[canonical, program]
   Definition BoolCategory : Category@{Set Set} :=
@@ -81,7 +59,7 @@ Section Very_Small_Categories.
     Obj := bool : Set ;
     Hom (x y : bool) := (implb x y = true)
   |}.
-  Solve All Obligations with (Bool.destr_bool; apply proof_irrelevance).
+  Solve Obligations of BoolCategory with (Bool.destr_bool; auto).
 
 End Very_Small_Categories.
 
@@ -121,15 +99,15 @@ Section More_Example_Categories.
   {|
     Obj := A ;
     Hom := eq ;
-    compose _ _ _ _ _ := refl;
+    compose _ _ _ _ _ := refl ;
     id _ := refl
   |}.
 
 End More_Example_Categories.
 
 
-#[universes(polymorphic), program]
-Definition OppositeCategory@{u v} (𝐂 : Category@{u v}) : Category@{u v} :=
+#[program]
+Definition OppositeCategory (𝐂 : Category) : Category :=
 {|
   Obj := Obj 𝐂 ;
   Hom A B := 𝐂.(Hom) B A ;
@@ -140,8 +118,7 @@ Next Obligation. apply eq_sym, compose_assoc. Qed.
 Next Obligation. apply compose_id_right. Qed.
 Next Obligation. apply compose_id_left. Qed.
 
-Notation "𝐂 *" := (OppositeCategory 𝐂)
-(at level 0, no associativity) : category_scope.
+Notation "𝐂 *" := (OppositeCategory 𝐂).
 
 
 Section Arrows.
@@ -149,8 +126,8 @@ Section Arrows.
   Variable 𝐂 : Category.
   Variables X Y : Obj 𝐂.
 
-  Definition Retract (f : X → Y) (g : Y → X) := g ∘ f = 1.
-  Definition Section (f : X → Y) (g : Y → X) := f ∘ g = 1.
+  Definition Retract (f : X → Y) (g : Y → X) := g ⋅ f = 1.
+  Definition Section (f : X → Y) (g : Y → X) := f ⋅ g = 1.
   Definition Inverse (f : X → Y) (g : Y → X) :=
     Retract f g /\ Section f g.
 
@@ -186,10 +163,10 @@ Section Arrows.
   Qed.
 
   Class Monic (f : X → Y) :=
-    rcancel : forall D (g g' : D → X), f ∘ g = f ∘ g' -> g = g'.
+    rcancel : forall D (g g' : D → X), f⋅g = f⋅g' -> g = g'.
 
   Class Epic (f : X → Y) :=
-    lcancel : forall C (g g' : Y → C), g ∘ f = g' ∘ f -> g = g'.
+    lcancel : forall C (g g' : Y → C), g⋅f = g'⋅f -> g = g'.
 
   Global Instance Retractible_Monic `{Retractible f} : Monic f.
   Proof.
@@ -225,15 +202,39 @@ Arguments Retractible {_} [_ _] f.
 Arguments Sectionable {_} [_ _] f.
 Arguments Isomorphism {_} [_ _] f.
 
-#[universes(polymorphic)]
+#[export] Hint Unfold Retract : category_scope.
+#[export] Hint Unfold Section : category_scope.
+#[export] Hint Unfold Inverse : category_scope.
+
 Class Isomorphic {𝐂 : Category} (X Y : 𝐂) :=
 {
   isomorphism : X → Y ;
   isomorphism_property :> Isomorphism isomorphism
 }.
 
-Notation "f ⁻¹" := (inverse f) (at level 0) : category_scope.
-Notation "A ≅ B" := (Isomorphic A B) (at level 70, no associativity) : category_scope.
+Notation "f ⁻¹" := (inverse f) : category_scope.
+Notation "A ≅ B" := (Isomorphic A B) : category_scope.
+
+Global Instance Isomorphic_equiv (𝐂 : Category) :
+  CRelationClasses.Equivalence (@Isomorphic 𝐂).
+Proof.
+  split.
+  - intro A. exists 1, 1. 
+    split; unfold Retract, Section; auto with categories.
+  - intros A B [f [f' [H1 H2]]]. exists f', f.
+    split; assumption.
+  - intros A B C [f [f' [H1 H2]]] [g [g' [H3 H4]]].
+    exists (g ⋅ f), (f' ⋅ g').
+    split; unfold Retract, Section in *.
+    + rewrite -> compose_assoc, <- compose_assoc with (g := g').
+      rewrite -> H3; autorewrite with categories.
+      rewrite -> H1; autorewrite with categories.
+      reflexivity.
+    + rewrite -> compose_assoc, <- compose_assoc with (g := f).
+      rewrite -> H2; autorewrite with categories.
+      rewrite -> H4; autorewrite with categories.
+      reflexivity.
+Qed.
 
 Definition Groupoid (𝐂 : Category) :=
   forall (X Y : 𝐂) (f : X → Y), Isomorphism f.
@@ -274,7 +275,7 @@ Section Special_Objects.
      initial_arrow_unique := null_arrow_out_unique |}.
 
   Definition zero `{Hnull : HasNull} {A B : 𝐂} : A → B
-    := null_arrow_out ∘ null_arrow_in.
+    := null_arrow_out ⋅ null_arrow_in.
 
 End Special_Objects.
 
@@ -287,7 +288,7 @@ Record Functor (𝐂 : Category) (𝐃 : Category) :=
 
   id_compat A : map (id A) = 1 ;
   compose_compat [A B C] (f : Hom B C) (g : Hom A B) :
-    map (f ∘ g) = (map f) ∘ (map g)
+    map (f ⋅ g) = (map f) ⋅ (map g)
 }.
 
 Global Opaque id_compat compose_compat.
@@ -305,10 +306,9 @@ Module Functor.
     Variables 𝐂 𝐃 : Category.
     Variables F G : 𝐂 ==> 𝐃.
 
-    Hypothesis Heq₀ : forall X : Obj 𝐂, F.(map₀) X = G.(map₀) X.
+    Hypothesis Heq₀ : forall X : Obj 𝐂, F X = G X.
 
-    Let obj_eq_rect `(f : Hom X Y) :
-    Hom (map₀ G X) (map₀ G Y) -> Hom (map₀ F X) (map₀ F Y).
+    Let obj_eq_rect `(f : Hom X Y) : (G X → G Y) → (F X → F Y).
       intro Gf.
       rewrite <- (Heq₀ X), <- (Heq₀ Y) in Gf.
       exact Gf.
@@ -329,8 +329,8 @@ Module Functor.
       { repeat (apply functional_extensionality_dep; intro).
         apply Heq₁. }
       destruct Eq₁.
-      assert (Eq₂ : F₂ = G₂). { apply proof_irrelevance. }
-      assert (Eq₃ : F₃ = G₃). { apply proof_irrelevance. }
+      assert (Eq₂ : F₂ = G₂) by auto.
+      assert (Eq₃ : F₃ = G₃) by auto.
       destruct Eq₂, Eq₃.
       reflexivity.
     Qed.
@@ -342,7 +342,7 @@ Module Functor.
     map _ _ f := map F (map G f)
   |}.
   Next Obligation. repeat rewrite id_compat; reflexivity. Qed.
-  Next Obligation.  repeat rewrite compose_compat; reflexivity. Qed.
+  Next Obligation. repeat rewrite compose_compat; reflexivity. Qed.
 
   Program Definition id {𝐂 : Category} : 𝐂 ==> 𝐂 := 
   {|
@@ -381,7 +381,7 @@ Global Hint Rewrite -> Functor.compose_assoc : categories.
 Global Hint Rewrite -> Functor.compose_id_left : categories.
 Global Hint Rewrite -> Functor.compose_id_right : categories.
 
-#[universes(polymorphic), canonical]
+#[canonical]
 Definition CategoryCategory : Category :=
 {|
   Obj := Category ;
@@ -393,11 +393,11 @@ Definition CategoryCategory : Category :=
   compose_id_right := @Functor.compose_id_right
 |}.
 
-#[universes(polymorphic)]
+
 Definition HomFunctor [𝐂 : Category] (A : Obj 𝐂) : 𝐂 ==> TypeCategory :=
 {|
   map₀ := Hom A;
-  map _ _ f := fun α => f ∘ α ;
+  map _ _ f := fun α => f ⋅ α ;
   id_compat _ := functional_extensionality _ _ (fun f => compose_id_left 𝐂 f);
   compose_compat X Y Z f g :=
     functional_extensionality _ _ (fun α => symmetry (compose_assoc _ f g α))
@@ -414,12 +414,11 @@ Class Faithful `(F : 𝐂 ==> 𝐃) :=
   forall (X Y : Obj 𝐂) (f₁ f₂ : Hom X Y),
   (map F f₁ = map F f₂) -> f₁ = f₂.
 
-#[universes(polymorphic)]
+
 Class Natural [𝐂 𝐃 : Category] [F G : Functor 𝐂 𝐃]
      (τ : forall X : 𝐂, Hom (F X) (G X)) :=
-  naturality : forall `(f : Hom X Y), (map G f) ∘ τ X = τ Y ∘ (map F f).
+  naturality : forall `(f : Hom X Y), (map G f) ⋅ τ X = τ Y ⋅ (map F f).
 
-#[universes(polymorphic, cumulative)]
 Record NaturalTransformation [𝐂 𝐃 : Category] (F G : Functor 𝐂 𝐃) := mk_nt
 {
   transformation :> forall X, Hom (F X) (G X) ;
@@ -447,8 +446,8 @@ Module Natural.
     Variable σ : forall X : 𝐀, Hom (F X) (F' X).
     Variable τ : forall Y : 𝐁, Hom (G Y) (G' Y).
 
-    Definition hcompose : forall X : 𝐀, Hom ((G ∘ F) X) ((G' ∘ F') X) :=
-      fun X => (τ (F' X)) ∘ (map G (σ X)).
+    Definition hcompose : forall X : 𝐀, (G ⋅ F) X → (G' ⋅ F') X :=
+      fun X => (τ (F' X)) ⋅ (map G (σ X)).
 
     Context {nₛ : Natural σ}.
     Context {nₜ : Natural τ}.
@@ -458,7 +457,7 @@ Module Natural.
       intros X X' f; unfold hcompose; simpl.
       specialize (nₛ X X' f).
       specialize (nₜ (F' X) (F' X') (map F' f)).
-      rewrite -> compose_assoc, -> nₜ.
+      rewrite -> compose_assoc. rewrite -> nₜ.
       repeat (rewrite <- compose_assoc, <- compose_compat).
       repeat f_equal.
       exact nₛ.
@@ -474,7 +473,7 @@ Module Natural.
     Variable τ' : forall X : 𝐂, Hom (F X) (G X).
 
     Definition compose : forall X : 𝐂, Hom (F X) (H X) :=
-      fun X => τ X ∘ τ' X.
+      fun X => τ X ⋅ τ' X.
 
     Context {nat : Natural τ}.
     Context {nat' : Natural τ'}.
@@ -521,6 +520,8 @@ Module Natural.
 
 End Natural.
 
+#[export] Hint Resolve Natural.extensionality : category_scope.
+
 #[canonical, universes(polymorphic), program]
 Definition FunctorCategory (𝐂 𝐃 : Category) :=
 {|
@@ -537,11 +538,11 @@ Next Obligation.
 Qed.
 Next Obligation.
   destruct f as [τ]; apply Natural.extensionality.
-  intro X. cbv. auto with categories.
+  compute. auto with categories.
 Qed.
 Next Obligation.
   destruct f as [τ]; apply Natural.extensionality.
-  intro X. cbv. apply compose_id_right.
+  compute. auto with categories.
 Qed.
 
 
@@ -553,15 +554,15 @@ Section Yoneda_Lemma.
   #[program]
   Definition N : 𝐂 ==> TypeCategory :=
     {| map₀ A := NaturalTransformation (HomFunctor A) F ;
-       map A B f τ := mk_nt (fun X g => τ X (g ∘ f)) _ |}.
+       map A B f τ := mk_nt (fun X g => τ X (g⋅f)) _ |}.
   Next Obligation.
     intros X Y g.
     destruct τ as [τ H]; unfold Natural in H; simpl.
     specialize (H X Y g); simpl in H.
     set (ϕ := fun x : A → X => map F g (τ X x)) in H.
-    set (ψ := fun x : A → X => τ Y (g ∘ x)) in H.
+    set (ψ := fun x : A → X => τ Y (g⋅x)) in H.
     apply functional_extensionality. intro x.
-    pose proof (H' := equal_f H (x ∘ f)).
+    pose proof (H' := equal_f H (x⋅f)).
     subst ϕ ψ; simpl in H'.
     rewrite -> compose_assoc in H'.
     exact H'.
@@ -596,13 +597,13 @@ Section Yoneda_Lemma.
   Next Obligation.
     eexists (fun A f => map F f X0).
     intros A B f; apply functional_extensionality; simpl; intro g.
-    rewrite compose_compat; reflexivity.
+    rewrite -> compose_compat. reflexivity.
   Defined.
   Next Obligation.
     intros X Y f; apply functional_extensionality; intro fx; simpl.
     apply Natural.extensionality; intro A; simpl.
     apply functional_extensionality; intro g; simpl.
-    rewrite compose_compat; reflexivity.
+    rewrite -> compose_compat. reflexivity.
   Qed.
 
   Global Instance yoneda_isomorphism : Isomorphism yoneda.
